@@ -6,197 +6,261 @@ using namespace std;
 using namespace ariel;
 
 
+
 namespace ariel{
 
-    
-    static map<string,map<string,double>>mp;
+     const double EPS=0.0001;
+    map <string,map<string,double>> NumberWithUnits::mp;
 
-    NumberWithUnits::NumberWithUnits(double num,const string str){
+    NumberWithUnits::NumberWithUnits(double num,const string& str){
+        if(NumberWithUnits::mp.find(str)==NumberWithUnits::mp.end()){
+            throw invalid_argument ("this unit does not exists in map - cant create this num");
+        }
         this->number=num;
-        this->unit=str;
+        this->unit=str;    
     }
 
 
-
-    NumberWithUnits n(0,"9");
-
-    void ariel::NumberWithUnits::read_units(ifstream& units){
-        // Read from the text file
-        ifstream MyFile("units.txt");
+    void NumberWithUnits::read_units(ifstream& units){
+       
         string line;
 
         // Use a while loop together with the getline() function to read the file line by line
         string unit1;
         string unit2;
         string num;
-        while(getline(MyFile, line))
+        while(getline(units, line))
         {
             u_int i=2;
             string unit1;
             string num;
             string unit2;
 
-            while(line[i]!='='){
+            while(line[i]!=' '){
                unit1+=line[i];
                i++; 
             }
-            i+=2;
+            i+=3;
             while(line[i]!=' '){
                num+=line[i];
                i++; 
             }
+            i++;
             while(line[i]!='\0'){
                unit2+=line[i];
                i++; 
             }
 
-            mp[unit1][unit2]=stod(num);  
-            mp[unit2][unit1]=1/stod(num);
+            NumberWithUnits::mp[unit1][unit2]=stod(num);  
+            NumberWithUnits::mp[unit2][unit1]=1/stod(num);
+            NumberWithUnits::mp[unit1][unit1]=1;
+            NumberWithUnits::mp[unit2][unit2]=1;
         
         }
-        
-        // Close the file
-        MyFile.close();
+         
     }
 
-    static double find_connection(string str1,string str2){
+    double NumberWithUnits::find_connection(const string& str1,const string& str2){
+        map<string,double>convert;
+        stack<string>st;
+        st.push(str1);
+        convert[str1]=1;
+        while (!st.empty()){
+           string curr_key=st.top();
+           st.pop();
+           for(pair<string,double>curr_pair:NumberWithUnits::mp[curr_key]){
+               if(convert.find(curr_pair.first)==convert.end()){
+               st.push(curr_pair.first);
+               }
+               convert[curr_pair.first]=curr_pair.second*convert[curr_key];
+               if(curr_pair.first==str2){
+                   return convert[curr_pair.first];
+               }
+           }
 
-        
-
-        double convert_cost=1;
-        list <string> queue;
-        map<string,bool>visited;
-        queue.push_back(str1);
-        string curr_key;
-        while(!queue.empty()){
-            curr_key=queue.front();
-            queue.pop_front();
-            if(mp.find(curr_key)!=mp.end()){
-                if(visited.find(curr_key)==visited.end()){
-                    for(pair<string,double>curr_pair : mp[curr_key]){
-                        
-                        if(visited.find(curr_pair.first)==visited.end()){
-                            queue.push_back(curr_pair.first);
-                        }
-                        if(curr_pair.first!=str2){
-                        convert_cost*=curr_pair.second;
-                        }
-                        if(curr_key==str1 && curr_pair.first==str2){
-                           return curr_pair.second;
-                        }  
-                        if(curr_key!=str1 && curr_pair.first==str2){
-                            return convert_cost*curr_pair.second;
-                        }
-                        visited[curr_key]=true;   
-                    }
-                }
-            }
-              
         }
-
-        return -1;
+        
+       return -1;
     }
+
 
     
     
-
-
-
-    // to do compare the units 
     int compare(const NumberWithUnits& num1,const NumberWithUnits& num2){
-        if(num1.number<num2.number){
-           return 1;
+        double convert=NumberWithUnits::find_connection(num2.unit,num1.unit);
+        if(convert==-1){
+            throw invalid_argument("can't compare unrelated unites"); 
         }
-        if(num1.number>num2.number){
-            return 2;
+        if(num1.unit==num2.unit){
+            if(num1.number<num2.number){
+                return -1;
+            }else if(num1.number>num2.number){
+                return 1;
+            }else if( abs(num1.number-num2.number)<EPS){
+                return 0;   
+            }
+
+        }else{
+            if(num1.number<num2.number*convert){
+                return -1;
+            }else if(num1.number>num2.number*convert){
+                return 1;
+            }else if(abs(num1.number-num2.number*convert)<EPS){
+                return 0;
+            }
         }
-        
-        return 0;
+        return 2;  
     }
+
 
 
     // onary
-    NumberWithUnits operator+ (const NumberWithUnits& n1){
-        return n1;
+    NumberWithUnits NumberWithUnits:: operator+ (){
+        return NumberWithUnits(this->number,this->unit);
     }
 
-    // return n1 after changes
-    NumberWithUnits operator += (const NumberWithUnits &n1 ,const NumberWithUnits& n2){
-        return n;
+    // return this after changes
+    NumberWithUnits& NumberWithUnits::operator += (const NumberWithUnits &n1 ){
+        double convert=NumberWithUnits::find_connection(n1.unit,this->unit);
+         if(convert==-1){
+            throw invalid_argument("cant sum unrelated units"); 
+        }else{
+            this->number+=n1.number*convert;
+            return *this;
+            
+        }
+       
     }
-    NumberWithUnits operator+ (const NumberWithUnits& n1,const NumberWithUnits& n2){
-        return n;
+    NumberWithUnits NumberWithUnits:: operator+ (const NumberWithUnits& n1){
+        double convert=NumberWithUnits::find_connection(n1.unit,this->unit);
+        if(convert==-1){
+             throw invalid_argument("cant sum unrelated units"); 
+        }else{
+            double num=this->number+n1.number*convert;
+            return NumberWithUnits(num,this->unit);
+          
+        }
+       
     }
 
     // onary
-    NumberWithUnits operator- (const NumberWithUnits& n1){
-       return NumberWithUnits (n1.number*-1,n1.unit);
+    NumberWithUnits NumberWithUnits::operator- (){
+      return NumberWithUnits(this->number*-1,this->unit);
     }
 
-    // return n1 after changes
-    NumberWithUnits operator-= (const NumberWithUnits& n1,const NumberWithUnits& n2){
-        return n;
-    }
-    NumberWithUnits operator- (const NumberWithUnits& n1,const NumberWithUnits& n2){
-        return n;
-    }
-
-    NumberWithUnits operator *(const NumberWithUnits& n1,double d){
-        return NumberWithUnits (n1.number *d,n1.unit);
-    }
+    // return this after changes
+    NumberWithUnits& NumberWithUnits::operator-= (const NumberWithUnits& n1){
+        double convert=NumberWithUnits::find_connection(n1.unit,this->unit);
+        if(convert==-1){
+            throw invalid_argument("can't sub unrelated units"); 
+        }else{
+            this->number-=n1.number*convert;
+            return *this;
             
-    NumberWithUnits operator *(double d, NumberWithUnits& n1){
-        return NumberWithUnits (n1.number *d,n1.unit);
-    }
-            
-
-    bool operator <(const NumberWithUnits&  n1,const NumberWithUnits& n2){
-        return true;
-    }
-    bool operator <=(const NumberWithUnits&  n1,const NumberWithUnits& n2){
-        return true;
-    }
-    bool operator >(const NumberWithUnits& n1,const NumberWithUnits& n2){
-        return true;
-    }
-    bool operator >=(const NumberWithUnits& n1,const NumberWithUnits& n2){
-        return true;
-    }
-    bool operator ==(const NumberWithUnits & n1,const NumberWithUnits& n2){
-        return true;
-    }
-    bool operator !=(const NumberWithUnits& n1,const NumberWithUnits& n2){
-        return true;
-    }
-
-     // // // // prefix and postfix 
-        // ++x
-        NumberWithUnits operator++(NumberWithUnits& n1){
-              
-            return NumberWithUnits (++n1.number,n1.unit);
         }
-        // x++
-        NumberWithUnits operator++(NumberWithUnits& n1,int num){
+    }
+    NumberWithUnits NumberWithUnits::operator- (const NumberWithUnits& n1){
+        double convert=NumberWithUnits::find_connection(n1.unit,this->unit);
+        if(convert==-1){
+            throw invalid_argument("can't sub unrelated units"); 
+        }else{
+            double num=this->number-n1.number*convert;
+            return NumberWithUnits(num,this->unit);
+          
+        }
+    }
+
+    NumberWithUnits NumberWithUnits::operator *(double d){
+        return NumberWithUnits (this->number*d,this->unit);
+    }
             
-            return NumberWithUnits (n1.number++,n1.unit);
+    NumberWithUnits operator *(double d, const NumberWithUnits& n1){
+        return NumberWithUnits (n1.number*d,n1.unit);
+    }
             
-        } 
+
+    bool NumberWithUnits::operator <(const NumberWithUnits& n2)const{
+        return (compare(*this,n2)==-1);
+           
+    }
+    bool NumberWithUnits::operator <=(const NumberWithUnits& n2)const{
+        return (compare(*this,n2)==-1 || compare(*this,n2)==0 );
+            
         
-         // --x
-        NumberWithUnits operator--(NumberWithUnits& n1){
-            return NumberWithUnits (--n1.number,n1.unit);
+    }
+    bool NumberWithUnits::operator >(const NumberWithUnits& n2)const{
+        return (compare(*this,n2)==1 );
+        
+    }
+    bool NumberWithUnits::operator >=(const NumberWithUnits& n2)const{
+        return(compare(*this,n2)==1 || compare(*this,n2)==0 );
+       
+    }
+    bool NumberWithUnits::operator ==(const NumberWithUnits& n2)const{
+        return(compare(*this,n2)==0 );
+        
+    }
+    bool NumberWithUnits::operator !=(const NumberWithUnits& n2)const{
+        return !(compare(*this,n2)==0);
+         
+    }
+
+    // // // // prefix and postfix 
+    // ++x
+    NumberWithUnits& NumberWithUnits::operator++(){    
+        this->number++;
+        return *this;
+    }
+    // x++
+    NumberWithUnits NumberWithUnits::operator++(int n){
+        
+        NumberWithUnits temp{this->number,this->unit};
+        this->number++;
+        return temp;
+
+        
+    } 
+    
+        // --x
+    NumberWithUnits& NumberWithUnits::operator--(){
+        this->number--;
+        return *this;
+    }
+
+    // x--
+    NumberWithUnits NumberWithUnits::operator--(int n){
+        NumberWithUnits temp{this->number,this->unit};
+        this->number--;
+        return temp;
+    }
+
+    // // // // // //  input and output 
+    std::ostream& operator << (std::ostream& out,const NumberWithUnits& n1){
+        out<<n1.number<<"["<<n1.unit <<"]";
+        return out;
+    }
+
+    std::istream& operator >>(std::istream& in, NumberWithUnits& n1){
+        char left_bracket;
+        char right_bracket;
+        double num;
+        string unit;
+        in >> num >> left_bracket >> unit;
+        if(unit.find(']')!=string::npos)//if there is a right ]
+        {
+            size_t position = unit.find(']');
+            unit = unit.substr(0, position);
+        }else{
+            in>>right_bracket;
         }
 
-        // x--
-        NumberWithUnits operator--(NumberWithUnits& n1,int num){
-            return NumberWithUnits (n1.number--,n1.unit);
+        if(NumberWithUnits::mp.find(unit)==NumberWithUnits::mp.end())
+        {
+            throw invalid_argument("no such unit in map");
         }
-     // // // // // //  input and output 
-        std::ostream& operator << (std::ostream& out,const NumberWithUnits& n1){
-            out<<n1.number<<" ["<<n1.unit <<" ]"<<endl;
-            return out;
-        }
-        std::istream& operator >>(std::istream& in, NumberWithUnits& n1){
-            return in;
-        }
+        n1.number=num;
+        n1.unit=unit;
+        
+        return in;
+    }
 }
