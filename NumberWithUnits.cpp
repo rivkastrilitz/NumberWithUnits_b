@@ -61,6 +61,7 @@ namespace ariel{
     }
 
     double NumberWithUnits::find_connection(const string& str1,const string& str2){
+     
         map<string,double>convert;
         stack<string>st;
         st.push(str1);
@@ -69,7 +70,7 @@ namespace ariel{
            string curr_key=st.top();
            st.pop();
            for(pair<string,double>curr_pair:NumberWithUnits::mp[curr_key]){
-               if(convert.find(curr_pair.first)==convert.end()){
+               if(convert.find(curr_pair.first)==convert.end()&& NumberWithUnits::mp.find(curr_pair.first)!=NumberWithUnits::mp.end()){
                st.push(curr_pair.first);
                }
                convert[curr_pair.first]=curr_pair.second*convert[curr_key];
@@ -92,21 +93,21 @@ namespace ariel{
             throw invalid_argument("can't compare unrelated unites"); 
         }
         if(num1.unit==num2.unit){
-            if(num1.number<num2.number){
-                return -1;
+            if(abs(num1.number-num2.number)<EPS){
+                return 0;
             }else if(num1.number>num2.number){
                 return 1;
-            }else if( abs(num1.number-num2.number)<EPS){
-                return 0;   
+            }else if(num1.number<num2.number ){
+                return -1;   
             }
 
         }else{
-            if(num1.number<num2.number*convert){
-                return -1;
+            if(abs(num1.number-num2.number*convert)<EPS){
+                return 0;
             }else if(num1.number>num2.number*convert){
                 return 1;
-            }else if(abs(num1.number-num2.number*convert)<EPS){
-                return 0;
+            }else if(num1.number<num2.number*convert){
+                return -1;
             }
         }
         return 2;  
@@ -241,9 +242,9 @@ namespace ariel{
     }
 
     std::istream& operator >>(std::istream& in, NumberWithUnits& n1){
-        char left_bracket;
-        char right_bracket;
-        double num;
+        char left_bracket=0;
+        char right_bracket=0;
+        double num=NAN;
         string unit;
         in >> num >> left_bracket >> unit;
         if(unit.find(']')!=string::npos)//if there is a right ]
